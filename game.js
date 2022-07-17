@@ -106,7 +106,7 @@ class Field {
             let isLive = false;
             const nextNeighbours = Field.getNeighbours(target[0], target[1], this._rows - 1, this._cols - 1);
             for (const nextTarget of nextNeighbours) {
-                if (this._grid[nextTarget[0]][nextTarget[1]] === space) {
+                if (this._grid[nextTarget[0]][nextTarget[1]] === space || this._grid[nextTarget[0]][nextTarget[1]] === hat) {
                     isLive = true;
                 }
             }
@@ -351,27 +351,11 @@ randomGames(10, 20, 40, true);
 
 /* 2) Provide a field array and play a single game */
 /* uncomment below and replace field with your own */
-// const providedField = [
-//     ['░', '░', '*'],
-//     ['░', '░', '░'],
-//     ['^', '░', '░']
-// ];
+// const providedField = Field.generateField(10, 20, 40, true);
 // game(providedField);
 
 
-/* 3) Find solution to a given field */
-/* uncomment below and replace field with your own */
-// const providedField = Field.generateField(10, 20, 40, true);
-// const solution = Field.solveField(providedField);
-// if (! solution) {
-//     console.log("The field is not solvable.");
-// }
-// else if (typeof solution === "string") {
-//     console.log(`The solution is: ${solution}`);
-// }
-
-
-/* 4) Provide a field array and auto solve it */
+/* 3) Provide a field array and auto solve it */
 /* uncomment below and replace field with your own */
 // const providedField = Field.generateField(10, 20, 40, true);
 // const playField = new Field(providedField);
@@ -386,4 +370,16 @@ randomGames(10, 20, 40, true);
 //     playField.autoMove(solution);
 //     console.log("The finished field: \n");
 //     playField.print()
+// }
+
+
+/* 4) Find solution to a given field */
+/* uncomment below and replace field with your own */
+// const providedField = Field.generateField(10, 20, 40, true);
+// const solution = Field.solveField(providedField);
+// if (! solution) {
+//     console.log("The field is not solvable.");
+// }
+// else if (typeof solution === "string") {
+//     console.log(`The solution is: ${solution}`);
 // }
