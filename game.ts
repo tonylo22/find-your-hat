@@ -1,10 +1,13 @@
-/* find your hat typescript */
+/* find your hat */
+/* scroll to bottom to see playing options */
+
 
 // constants
 const hat = '^';
 const hole = 'O';
 const space = '░';
 const path = '*';
+
 
 // type alias
 type coords = [number, number];
@@ -112,12 +115,46 @@ class Field {
         else {
             this._pos = target;
             this._grid[target[0]][target[1]] = path;
+            // check if player runs into dead end (since going back is not allowed)
+            let isLive = false;
+            const nextNeighbours = Field.getNeighbours(target[0], target[1], this._rows-1, this._cols-1);
+            for (const nextTarget of nextNeighbours) {
+                if (this._grid[nextTarget[0]][nextTarget[1]] === space) {isLive = true;}
+            }
+            if (! isLive) {
+                this.inPlay = false;
+                console.log("\n");
+                this.print();
+                console.log("\nYou run into a dead end, you lost!");
+            }
+        }
+    }
+
+
+    // auto execute a sequence of moves
+    autoMove(moveString: string): void {
+        moveString = moveString.toLowerCase();
+        for (const char of moveString) {
+            if (! "wasd".includes(char)) {
+                console.log("Move string contains invalid move");
+                return;
+            }
+        }
+        for (const move of moveString) {
+            this.move(move);
         }
     }
 
 
     // generate random field
     static generateField(height: number, width: number, percentage: number = -1, randomStart: boolean = false): string[][] {
+        if (height < 3 || width < 3) {
+            console.log("minimum size: 3 x 3");
+            height = 3;
+            width = 3;
+        }
+        let startRow: number;
+        let startCol: number;
         let randRow: number;
         let randCol: number;
         let grid: string[][];
@@ -134,17 +171,24 @@ class Field {
                 }
             }
             // add initial path (at (0, 0) or random)
-            if (!randomStart) {grid[0][0] = path;}
+            if (!randomStart) {
+                startRow = 0;
+                startCol = 0;
+                grid[0][0] = path;
+            }
             else {
                 randRow = Math.floor(Math.random() * height);
                 randCol = Math.floor(Math.random() * width);
+                startRow = randRow;
+                startCol = randCol;
                 grid[randRow][randCol] = path;
             }
-            // add hat at random position
+            // add hat at random position, provided that it is some distance away from the start
             while(true) {
                 randRow = Math.floor(Math.random() * height);
                 randCol = Math.floor(Math.random() * width);
-                if (grid[randRow][randCol] === space) {
+                let distFromStart = Math.abs(randRow - startRow) + Math.abs(randCol - startCol); // taxicab distance
+                if (grid[randRow][randCol] === space && distFromStart >= (height + width) / 2) {
                     grid[randRow][randCol] = hat;
                     break;
                 }
@@ -162,15 +206,15 @@ class Field {
                 }
                 else {continue;}
             }
-        } while(!Field.validateField(grid))
- 
+        } while(!Field.solveField(grid))
         return grid;
     }
 
 
     // helper method to ensure a grid is playable, using breadth first search
-    static validateField(grid: string[][]): boolean {
-        const queue: coords[] = [];  // a queue for bfs
+    // can be used independently to solve a given field, return a solution string
+    static solveField(grid: string[][]): boolean | string {
+        const queue: coords[][] = [];  // a queue for bfs, would contain routes of search
         const explored: boolean[][] = [];
         // create a grid to indicate whether the cells have been explored
         // all cells are initialized to false, except the starting pos is true
@@ -179,25 +223,38 @@ class Field {
             for (let c=0; c < grid[0].length; c++) {
                 if (grid[r][c] === path) {
                     explored[r].push(true);
-                    queue.push([r, c]);  // initialize bfs starting point
+                    queue.push([[r, c]]);  // initialize bfs starting point
                 }
                 else {explored[r].push(false);}
             }
         }
+        // ensure the field has a single starting point
+        if (queue.length != 1) {
+            console.log("The field contains no or multiple starting points, invalid");
+            return false;
+        }
         // bfs
+        let currentRoute: coords[];
         let currentPos: coords;
         let currentCell: string;
         let neighbours: coords[];
-        while (queue.length != 0) {
-            currentPos = queue.shift()!;
+        let oldRoute: coords[];
+        let newRoute: coords[];
+        while (queue.length > 0) {
+            currentRoute = queue.shift()!;
+            currentPos = currentRoute[currentRoute.length-1];
             currentCell = grid[currentPos[0]][currentPos[1]];
-            if (currentCell === hat) {return true;}
+            if (currentCell === hat) {
+                return Field.genMoveString(currentRoute);
+            }
             if (currentCell !== hole) {
+                oldRoute = [...currentRoute];
                 // get the surrounding cells
                 neighbours = Field.getNeighbours(currentPos[0], currentPos[1], grid.length-1, grid[0].length-1);
                 for (const cell of neighbours) {
                     if (! explored[cell[0]][cell[1]]) {
-                        queue.push(cell);
+                        newRoute = oldRoute.concat([cell]);
+                        queue.push(newRoute);
                         explored[cell[0]][cell[1]] = true;
                     }
                 }
@@ -215,7 +272,26 @@ class Field {
         if (col-1 >= 0) {results.push([row, col-1]);}
         if (col+1 <= maxCol) {results.push([row, col+1]);}
         return results;
-      }
+    }
+
+
+    // helper method to convert a sequence of coords to a string of sequence of moves
+    static genMoveString(sequence: coords[]): string {
+        let moves = "";
+        for (let i=0; i < sequence.length-1; i++) {
+            if (sequence[i+1][0] - sequence[i][0] == -1) {moves += "w";}
+            else if (sequence[i+1][0] - sequence[i][0] == 1) {moves += "s";}
+            else if (sequence[i+1][1] - sequence[i][1] == 1) {moves += "d";}
+            else if (sequence[i+1][1] - sequence[i][1] == -1) {moves += "a";}
+            else {
+                console.log("sequence is not continuous, cannot generate result")
+                return "";
+            }
+        }
+        // console.log(moves);
+        return moves;
+    }
+
 }
 // end of Field class
 
@@ -224,7 +300,7 @@ class Field {
 function game(grid: string[][]) {
     let move: string;
     const playingField = new Field(grid);
-    console.log("start game (press x to quit / when stuck)");
+    console.log("start game (press x to quit)");
     while (playingField.inPlay) {
       playingField.print();
       move = prompt("pick a direction [w/a/s/d]")!;
@@ -237,9 +313,9 @@ function game(grid: string[][]) {
       playingField.move(move);
       console.log("\n");
     }
-  }
+}
   
-
+  
 // play multiple games with random fields
 function randomGames(row: number, col: number, percentage:number = -1, randomStart: boolean = false) {
     let replay: string;
@@ -250,20 +326,56 @@ function randomGames(row: number, col: number, percentage:number = -1, randomSta
       replay = prompt(`Replay? [yes/y/no/n] `)!;
       console.log("\n");
     } while(replay.toLowerCase() === "yes" || replay.toLowerCase() === "y")
-  }
+}
 
 
-// const test = new Field([
+/* ========================================================================================= */
+/* There are different ways to play, uncomment your preferred one */
+
+
+/* 1) Play random fields with replay option */
+/* inputs: rows, cols, holes percentage (0-75), start at random point or (0, 0) (true/false) */
+/* uncomment below */
+randomGames(10, 20, 40, true);
+
+
+/* 2) Provide a field array and play a single game */
+/* uncomment below and replace field with your own */
+// const providedField = [
 //     ['░', '░', '*'],
 //     ['░', '░', '░'],
 //     ['^', '░', '░']
-// ]);
-// test.print();
-// console.log(test._pos);
+// ];
+// game(providedField);
 
-// const testGrid = Field.generateField(10, 20, 40);
-// const test = new Field(testGrid);
-// test.print();
 
-// arguments: height(rows), width(cols), holes percentage, random start
-randomGames(10, 20, 40, true);
+/* 3) Find solution to a given field */
+/* uncomment below and replace field with your own */
+// const providedField = Field.generateField(10, 20, 40, true);
+// const solution = Field.solveField(providedField);
+// if (! solution) {
+//     console.log("The field is not solvable.");
+// }
+// else if (typeof solution === "string") {
+//     console.log(`The solution is: ${solution}`);
+// }
+
+
+
+/* 4) Provide a field array and auto solve it */
+/* uncomment below and replace field with your own */
+// const providedField = Field.generateField(10, 20, 40, true);
+// const playField = new Field(providedField);
+// console.log("The starting field: \n");
+// playField.print()
+// const solution = Field.solveField(providedField);
+// if (! solution) {
+//     console.log("The field is not solvable.");
+// }
+// else if (typeof solution === "string") {
+//     console.log(`The solution is: ${solution}`);
+//     playField.autoMove(solution);
+//     console.log("The finished field: \n");
+//     playField.print()
+// }
+
